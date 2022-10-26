@@ -1,0 +1,267 @@
+Files are two types.
+1. Sequentil files/Non VSAm Files.      2 VSAM files.
+
+Q. How many ways , we can read the file?
+1. Sequential Read  : Read the record one by one.
+2. Random Read      : What ever record you want based on the key.
+3. Dynamic read     : Random + Sequential
+
+
+Q. Types of VSAM files?  --> 4 types
+
+1. ESDS  : Entry Sequetial Data Set.
+2. KSDS  : Key Sequetial Data Set.
+3. RRDS  : Relative Record Data Set.
+4. LDS   : Linear Data Set.  --> This is used for Systsem purpose.
+
+
+We will use below 3 only.
+1. ESDS  : Entry Sequetial Data Set.
+2. KSDS  : Key Sequetial Data Set.  --- Mostly we will use this one.
+3. RRDS  : Relative Record Data Set.
+
+
+Q. How can you access the files?
+ESDS : We can read on;y sequetially.
+KSDS : Sequential, Random, Dynamic..
+RRDS : Sequential, Random, Dynamic..
+
+
+Q. How can you define ESDS, KSDS and RRDS files?
+
+DEMO.JCL(IDCAMS04)
+------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                         
+//*                                                   
+//* CREATE VSAM ESDS FILE                             
+//*                                                   
+//STEP1  EXEC PGM=IDCAMS                              
+//SYSPRINT DD  SYSOUT=*                               
+//SYSIN    DD  *                                      
+                                                      
+  DEFINE CLUSTER (                                    
+               NAME(IBMUSER.ESDS1)            -       
+               VOL(S7SYS1)                    -       
+               TRK(5 2)                       -       
+               RECORDSIZE(100 100)            -       
+               NONINDEXED                     -       
+               SHR(2 3)                       -       
+               CISZ(2048))                    -       
+         DATA (NAME(OZA183.SMF.ESDS1.DATA))           
+/*                                                    
+=================================================================================================================================
+
+DEMO.JCL(IDCAMS05):
+-------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                     
+//*                                               
+//* CREATE VSAM KSDS FILE                         
+//*                                               
+//STEP1  EXEC PGM=IDCAMS                          
+//SYSPRINT DD  SYSOUT=*                           
+//SYSIN    DD  *                                  
+                                                  
+ DEFINE CLUSTER (NAME(IBMUSER.KSDS1) -            
+                 VOL(S7SYS1)         -            
+                 TRK(5 2)            -            
+                 FSPC(10 10)         -            
+                 KEYS(04 0)          -            
+                 RECSZ(100 100)      -            
+                 SHR(2 3)            -            
+                 INDEXED             -            
+                 CISZ(2048))         -            
+        DATA (NAME(OZA183.SMF.POLMST.DATA)) -     
+        INDEX (NAME(OZA183.SMF.POLMST.INDEX) -    
+/*	
+===================================================================================================================================
+DEMO.JCL(IDCAMS07):
+--------------------
+//IBMUSERX JOB NOTIFY=&SYSUID               
+//*                                         
+//* CREATE VSAM RRDS FILE                   
+//*                                         
+//STEP1  EXEC PGM=IDCAMS                    
+//SYSPRINT DD  SYSOUT=*                     
+//SYSIN    DD  *                            
+                                            
+ DEFINE CLUSTER (NAME(IBMUSER.RRDS1) -      
+                 VOL(S7SYS1)    -           
+                 TRK(5 2)       -           
+                 RECSZ(100 100) -           
+                 SHR(2 3)       -           
+                 NUMBERED       -           
+                 CISZ(2048))    -           
+        DATA (NAME(IBMUSER.RRDS1.DATA))     
+/*                                          
+
+==================================================================================================================================
+DEMO.JCL(IDCAMS11)
+------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                            
+//*                                                      
+//* DELETE ANY VSAM DATASET IF EXPIRY DATA IS NOT CODED  
+//*                                                      
+//STEP1  EXEC  PGM=IDCAMS                                
+//SYSPRINT DD  SYSOUT=*                                  
+//SYSIN    DD  *                                         
+ DELETE IBMUSER.ESDS1                                    
+ DELETE IBMUSER.KSDS1                                    
+ DELETE IBMUSER.RRDS1                                    
+/*
+===================================================================================================================================
+DEMO.JCL(IDCAMS17):
+====================
+//IBMUSERX JOB NOTIFY=&SYSUID                          
+//*                                                    
+//* DELETE ANY VSAM DATASET BEFORE EXPIRY DATE         
+//*                                                    
+//STEP1  EXEC PGM=IDCAMS                               
+//SYSPRINT DD   SYSOUT=*                               
+//SYSIN    DD   *                                      
+ DELETE IBMUSER.KSDS1 PURGE                            
+ DELETE IBMUSER.ESDS1 PURGE                            
+ DELETE IBMUSER.RRDS1 PURGE                            
+/*                                                     
+
+====================================================================================================================================
+//IBMUSERX JOB NOTIFY=&SYSUID                                 
+//*                                                           
+//***************************************************         
+//* HOW TO LOAD PS INTO KSDS                        *         
+//***************************************************         
+//*                                                           
+//* SORT PS ON KEY FIELD AND ELIMINATE DUPLICATES             
+//*                                                           
+//STEP1  EXEC PGM=SORT                                        
+//SYSPRINT DD  SYSOUT=*                                       
+//SORTIN   DD  DSN=IBMUSER.SAMPLE.FILE1,DISP=SHR              
+//SORTOUT  DD  DSN=&&TEMP1,DISP=(NEW,PASS),                   
+//             UNIT=SYSDA,SPACE=(TRK,(10,5),RLSE)             
+//SYSIN    DD   *                                             
+  SORT FIELDS=(1,4,CH,A)                                      
+  SUM FIELDS=NONE                                             
+/*                                                            
+//*                                                           
+//* LOAD SORTED FILE INTO VSAM KSDS                           
+//*                                               
+//STEP2  EXEC PGM=IDCAMS                          
+//SYSPRINT DD  SYSOUT=*                           
+//DD1      DD  DSN=&&TEMP1,DISP=(OLD,DELETE)      
+//DD2      DD  DSN=IBMUSER.SAMPLE.KSDS1,DISP=SHR  
+//SYSIN    DD   *                                 
+  REPRO  INFILE(DD1)  -                           
+        OUTFILE(DD2)                              
+/*                                                
+===============================================================================================================================
+DEMO.JCL(IDCAMS15) :
+--------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                                     
+//*                                                               
+//* UNLOAD KSDS FILE INTO A PS FILE WITH FROM KEY AND TO KEY      
+//*                                                               
+//STEP1  EXEC PGM=IDCAMS                                          
+//SYSPRINT DD  SYSOUT=*                                           
+//DD1      DD  DSN=IBMUSER.SAMPLE.KSDS1,DISP=SHR                  
+//DD2      DD  DSN=IBMUSER.SAMPLE.FILE1,DISP=SHR                  
+//SYSIN    DD   *                                                 
+  REPRO  INFILE(DD1)  -                                           
+        OUTFILE(DD2)  -                                           
+  FROMKEY(MMMM)       -                                           
+    TOKEY(SSSS)                                                   
+/*                                                                
+
+=================================================================================================================================
+DEMO.JCL(IDCAMS16):
+--------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                            
+//*                                                      
+//* UNLOAD KSDS FILE INTO A PS FILE WITH SKIP AND COUNT  
+//*                                                      
+//STEP1  EXEC PGM=IDCAMS                                 
+//SYSPRINT DD  SYSOUT=*                                  
+//DD1      DD  DSN=IBMUSER.SAMPLE.KSDS1,DISP=SHR         
+//DD2      DD  DSN=IBMUSER.SAMPLE.FILE1,DISP=SHR         
+//SYSIN    DD   *                                        
+  REPRO  INFILE(DD1)  -                                  
+        OUTFILE(DD2)  -                                  
+  SKIP(10)            -                                  
+  COUNT(5)                                               
+/*                                                       
+=================================================================================================================================
+DEMO.JCL(IDCAMS18):
+-----------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                                  
+//*                                                            
+//* HOW TO SEE DEFINE AND ALLOCATION ATTRIBUTES OF A VSAM FILE 
+//*                                                            
+//STEP1    EXEC PGM=IDCAMS                                     
+//SYSPRINT DD SYSOUT=*                                         
+//SYSIN    DD *                                                
+  LISTCAT ENTRIES(IBMUSER.KSDS1) ALL                           
+/*                                                             
+================================================================================================================================
+DEMO.JCL(IDCAMS19):
+-------------------
+//IBMUSERX JOB NOTIFY=&SYSUID                              
+//*                                                        
+//* VERIFY COMMAND TO RESOLVE OPEN ISSUE ON VSAM FILE      
+//*                                                        
+//STEP1  EXEC PGM=IDCAMS                                   
+//SYSPRINT DD SYSOUT=*                                     
+//SYSIN    DD *                                            
+  VERIFY DATASET(IBMUSER.KSDS1)                            
+/*                                                         
+==================================================================================================================================
+DEMO.JCL(IDCAMS20):
+====================
+//IBMUSERX JOB NOTIFY=&SYSUID            
+//*                                      
+//* PRINT FILE RECORDS INTO SYSPRINT     
+//*                                      
+//STEP1   EXEC PGM=IDCAMS                
+//SYSPRINT DD SYSOUT=*                   
+//SYSIN    DD *                          
+  PRINT INDATASET(IBMUSER.KSDS1) -       
+        CHARACTER                        
+/*                                       
+=============================================================================================================================
+
+IDCAMS is a utility. We will use below Commands. Each one has its own importance.
+1. DEFINE
+2. DELETE
+3. LISTCAT
+4. VERIFY
+5. PRINT
+6. REPRO
+
+
+===================================================================================================================================
+Q. How can you know whether the file used VSAM file or not?
+
+ENVIRONMENT DIVISION.                       
+INPUT-OUTPUT SECTION.                       
+FILE-CONTROL.                               
+                                            
+    SELECT EMP-FILE       ASSIGN TO EMPFILE 
+           ORGANIZATION   IS INDEXED/NON-INDEXED/RELATIVE        
+           ACCESS MODE    IS SEQUENTIAL/RANDOM/DYNAMIC        
+           RECORD KEY     IS EMP-ID         
+           FILE STATUS    IS WS-KSDS-STATUS.
+
+Based on the word beside organization, we can understand whether it is a ESDS/KSDS/RRDS.
+INDEXED     : KSDS
+NON-INDEXED : ESDS
+RELATIVE    : RRDS
+
+By looking on the ACCESS MODE, you can understand, what type of access you are using on the files.
+
+==================================================================================================================================
+
+
+
+
+
+
+
+
+
